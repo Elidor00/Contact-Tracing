@@ -85,7 +85,6 @@ check_list(ActorList, PidDispatcher) ->
   ActorList ! {get_list, self()},
   receive
     L ->
-      io:format("Places in ~p check_list: ~p~n", [PidDispatcher, L]),
       case length(L) >= 3 of
         true -> ok;
         false ->
@@ -108,7 +107,6 @@ visit_place(ActorList, PidDispatcher) ->
           LUOGO ! {begin_visit, PidDispatcher, REF},
 
           receive end_visit ->
-            io:format("Received end_visit"),
             LUOGO ! {end_visit, PidDispatcher, REF}
           after 5000 + rand:uniform(5000) -> ok end,
 
@@ -127,12 +125,12 @@ trace_contact_loop(PidDispatcher) ->
   receive
     {contact, PID} ->
       %let it fail
-      %try
-      link(PID),
-      io:format("[User] ~p linked to ~p~n", [PidDispatcher, PID]),
-      %catch X ->
-      %  io:format("[User] ~p unable to link to ~p error ~p~n", [PidDispatcher, PID, X])
-      %end,
+      try
+        link(PID),
+        io:format("[User] ~p linked to ~p~n", [PidDispatcher, PID])
+      catch X ->
+        io:format("[User] ~p unable to link to ~p error ~p~n", [PidDispatcher, PID, X])
+      end,
       trace_contact_loop(PidDispatcher);
     {'EXIT', _, R} ->
       case R of
@@ -141,7 +139,9 @@ trace_contact_loop(PidDispatcher) ->
           exit(quarantine);
         positive ->
           io:format("[User] ~p entro in quaratena ~n", [PidDispatcher]),
-          exit(quarantine)
+          exit(quarantine);
+        Msg ->
+          io:format("[User] ~p mex non gestito ~p ~n", [self(),Msg])
       end;
     Msg ->
       % Check unexpected message from other actors

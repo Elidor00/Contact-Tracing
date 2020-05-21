@@ -12,7 +12,7 @@ init_luogo(Prob) ->
   visit_place([], Prob).
 
 get_probs() ->
-  Probs = #{contact_tracing => make_probability(80), check_for_closing => make_probability(10)},
+  Probs = #{contact_tracing => make_probability(25), check_for_closing => make_probability(10)},
   fun(X) ->
     maps:get(X, Probs)
   end.
@@ -21,7 +21,7 @@ get_probs() ->
 visit_place(L, Probs) ->
   receive
     {begin_visit, PID, Ref} ->
-      contact_tracing(PID, [PidOldUser || {PidOldUser, _, _} <- L], Probs(contact_tracing)),
+      contact_tracing(PID, [PidOldUser || {PidOldUser, _} <- L], Probs(contact_tracing)),
       check_for_closing(Probs(check_for_closing)),
       visit_place([{PID, Ref} | L], Probs);
     {end_visit, PID, Ref} ->
@@ -34,7 +34,7 @@ contact_tracing(NewUser, [PidOldUser | T], Prob) ->
   case Prob() of
     1 ->
       NewUser ! {contact, PidOldUser},
-      io:format("Contact from ~p to ~p", [NewUser, PidOldUser]);
+      io:format("Contact from ~p to ~p~n", [NewUser, PidOldUser]);
     _ -> ok
   end,
   contact_tracing(NewUser, T, Prob).
