@@ -21,20 +21,20 @@ get_probs() ->
 visit_place(L, Probs) ->
   receive
     {begin_visit, PID, Ref} ->
-      MRef = monitor(process, PID),
+%%      MRef = monitor(process, PID),
       % PidOldUser can die
       contact_tracing(PID, [PidOldUser || {PidOldUser, _, _} <- L], Probs(contact_tracing)),
       check_for_closing(Probs(check_for_closing)),
-      visit_place([{PID, Ref, MRef} | L], Probs);
+      visit_place([{PID, Ref} | L], Probs);
     {end_visit, PID, Ref} ->
-      [MRef] = [MR || {Pid, _, MR} <- L, Pid =:= PID],
-      demonitor(MRef),
-      visit_place(set_subtract(L, [{PID, Ref, MRef}]), Probs);
-    {'DOWN', MRef, process, PidExit, Reason} ->
-      [{Ref, MRef}] = [{R, MR} || {Pid, R, MR} <- L, Pid =:= PidExit],
-      io:format("[Luogo] ~p User ~p with Ref  ~p died with reason ~p ~n", [self(), PidExit, Ref, Reason]),
-      NL = set_subtract(L, [{PidExit, Ref, MRef}]),
-      visit_place(NL, Probs)
+%%      [MRef] = [MR || {Pid, _, MR} <- L, Pid =:= PID],
+%%      demonitor(MRef),
+      visit_place(set_subtract(L, [{PID, Ref}]), Probs)
+%%    {'DOWN', MRef, process, PidExit, Reason} ->
+%%      [{Ref, MRef}] = [{R, MR} || {Pid, R, MR} <- L, Pid =:= PidExit],
+%%      io:format("[Luogo] ~p User ~p with Ref  ~p died with reason ~p ~n", [self(), PidExit, Ref, Reason]),
+%%      NL = set_subtract(L, [{PidExit, Ref, MRef}]),
+%%      visit_place(NL, Probs)
   end.
 
 % PROTOCOLLO DI RILEVAMENTO DEI CONTATTI

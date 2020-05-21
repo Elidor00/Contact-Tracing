@@ -23,15 +23,16 @@ actorDispatcher() ->
   io:format("[ActorDispatcher] User ~p ActorRequiredTest ~p ~n", [self(), ActorRequiredTest]),
   ActorMergeList = spawn_link(?MODULE, get_places_updates, [self(), ActorList]),
   io:format("[ActorDispatcher] User ~p ActorMergeList ~p ~n", [self(), ActorMergeList]),
-  loop(ActorContactTrace, ActorRequiredTest, ActorMergeList).
+  loop(ActorContactTrace, ActorRequiredTest, ActorMergeList, VisitPlace).
 
-loop(ContactTrace, RequiredTest, MergList) ->
+loop(ContactTrace, RequiredTest, MergList, VisitPlace) ->
   receive
     {places, PIDLIST} ->
       MergList ! {places, PIDLIST};
     {contact, PID} -> ContactTrace ! {contact, PID};
     positive -> RequiredTest ! positive;
     negative -> RequiredTest ! negative;
+    end_visit -> VisitPlace ! end_visit;
     {'EXIT', Sender, R} -> 
     io:format("[Dispatcher] ~p received exit from ~p with: ~p~n", [self(), Sender, R]), 
     exit(R);
@@ -39,7 +40,7 @@ loop(ContactTrace, RequiredTest, MergList) ->
       % Check unexpected message from other actors
       io:format("[Dispatcher] ~p  ~p~n", [self(), Msg])
   end,
-  loop(ContactTrace, RequiredTest, MergList).
+  loop(ContactTrace, RequiredTest, MergList, VisitPlace).
 
 % PROTOCOLLO DI MANTENIMENTO DELLA TOPOLOGIA (b)
 list(PidDispatcher, L) ->
@@ -92,6 +93,13 @@ check_list(ActorList, PidDispatcher) ->
   sleep(10000),
   check_list(ActorList, PidDispatcher).
 
+flush() ->
+  receive
+    _ -> flush()
+  after
+    0 -> ok
+  end.
+
 % PROTOCOLLO DI VISITA DEI LUOGHI
 visit_places(ActorList, PidDispatcher) ->
   ActorList ! {get_list, self()},
@@ -101,8 +109,14 @@ visit_places(ActorList, PidDispatcher) ->
         true ->
           REF = make_ref(),
           [LUOGO|_] = take_random(L, 1),
+          flush(),
           LUOGO ! {begin_visit, PidDispatcher, REF},
-          sleep(5000 + rand:uniform(5000)),
+          receive end_visit ->
+            io:format("Received end_visit"),
+            LUOGO ! {end_visit, PidDispatcher, REF}
+          after 5000 + rand:uniform(5000) -> ok end,
+
+%%          sleep(5000 + rand:uniform(5000)),
           LUOGO ! {end_visit, PidDispatcher, REF};
         false -> ok
       end,
@@ -149,6 +163,7 @@ require_test(PidDispatcher, Probability) ->
       receive
         positive ->
           io:format("[User] ~p sono positivo ~n", [PidDispatcher]),
+          PidDispatcher ! end_visit,
           exit(positive);
         negative -> io:format("[User] ~p Sono negativo ~n", [PidDispatcher])
       end;
