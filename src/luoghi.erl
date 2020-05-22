@@ -47,7 +47,7 @@ check_for_closing(Prob) ->
   end.
 
 start() ->
-  [spawn(fun luogo/0) || _ <- lists:seq(1, 100)].
+  [spawn(fun luogo/0) || _ <- lists:seq(1, 1000)].
 
 luogo() ->
   io:format("Io sono il luogo ~p~n", [self()]),

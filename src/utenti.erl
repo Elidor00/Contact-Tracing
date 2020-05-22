@@ -20,6 +20,7 @@ actorDispatcher() ->
   io:format("[ActorDispatcher] User ~p ActorVisitPlace ~p ~n", [self(), ActorVisitPlace]),
   ActorRequireTest = spawn_link(?MODULE, require_test, [self(), make_probability(25)]),
   io:format("[ActorDispatcher] User ~p ActorRequireTest ~p ~n", [self(), ActorRequireTest]),
+  sleep(1000),
   dispatcher_loop(ActorListHandler, ActorRequireTest, ActorVisitPlace).
 
 dispatcher_loop(ListHandler, RequiredTest, VisitPlace) ->
@@ -37,28 +38,23 @@ dispatcher_loop(ListHandler, RequiredTest, VisitPlace) ->
           end
       end;
     {contact, PID} ->
-%%      ContactTrace ! {contact, PID};
-      try
-        link(PID),
-        io:format("[User] ~p linked to ~p~n", [self(), PID])
-      catch X ->
-        io:format("[User] ~p unable to link to ~p error ~p~n", [self(), PID, X])
+      % TODO: dummy fix for noproc... need to investigate...
+      case  erlang:process_info(PID) == undefined of
+        true -> ok;
+        false ->
+          link(PID),
+          io:format("[User] ~p linked to ~p~n", [self(), PID])
       end;
-%%    positive -> RequiredTest ! positive;
-%%    negative -> RequiredTest ! negative;
     positive ->
       io:format("[Dispatcher] ~p sono positivo ~n", [self()]),
       VisitPlace ! end_visit,
-      exit(positive); % può rompere la logica perchè non so se visit place lo processa
+      exit(positive);
     negative ->
       io:format("[Dispatcher] ~p Sono negativo ~n", [self()]);
     {'EXIT', Sender, R} ->
-      handle_exit_messages(R, "Dispatcher", self(), Sender);
-    Msg ->
-      % Check unexpected message from other actors
-      io:format("[Dispatcher] ~p Unexpected message ~p~n", [self(), Msg])
+      VisitPlace ! end_visit,
+      handle_exit_messages(R, "Dispatcher", self(), Sender)
   end,
-%%  dispatcher_loop(ContactTrace, RequiredTest, MergList, VisitPlace).
   dispatcher_loop(ListHandler, RequiredTest, VisitPlace).
 
 %%%%%%%%%%%%%%%%%%%% PROTOCOLLO DI MANTENIMENTO DELLA TOPOLOGIA (b) %%%%%%%%%%%%%%%%%%%%
@@ -74,13 +70,7 @@ list_handler(PidDispatcher, L) ->
   % messages from a dead place (DOWN)
     {_, _, process, Pid, _} ->
       global:send(server, {get_places, PidDispatcher}),
-      list_handler(PidDispatcher, set_subtract(L, [Pid]));
-%%    {'EXIT', Pid, R} ->
-%%      handle_exit_messages(R, "ListHandler", PidDispatcher, Pid);
-    Msg ->
-      % Check unexpected message from other actors
-      io:format("[User] ~p Messaggio non gestito ~p~n", [self(), Msg]),
-      list_handler(PidDispatcher, L)
+      list_handler(PidDispatcher, set_subtract(L, [Pid]))
   end.
 
 handle_exit_messages(R, Name, PidDispatcher, Pid) ->
@@ -126,7 +116,7 @@ visit_place(ActorList, PidDispatcher) ->
           LUOGO ! {begin_visit, PidDispatcher, REF},
           receive {end_visit, M} ->
             LUOGO ! {end_visit, PidDispatcher, REF},
-            handle_exit_messages(M,"VisitPlace end_visit", PidDispatcher, PidDispatcher)
+            handle_exit_messages(M, "VisitPlace end_visit", PidDispatcher, PidDispatcher)
           after 5000 + rand:uniform(5000) -> ok end,
           LUOGO ! {end_visit, PidDispatcher, REF};
         false -> ok
@@ -151,4 +141,4 @@ utente() ->
   main().
 
 start() ->
-  [spawn(fun utente/0) || _ <- lists:seq(1, 100)].
+  [spawn(fun utente/0) || _ <- lists:seq(1, 1000)].
