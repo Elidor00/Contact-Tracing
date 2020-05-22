@@ -21,8 +21,8 @@ get_probs() ->
 visit_place(L, Probs) ->
   receive
     {begin_visit, PID, Ref} ->
-      contact_tracing(PID, [PidOldUser || {PidOldUser, _} <- L], Probs(contact_tracing)),
       check_for_closing(Probs(check_for_closing)),
+      contact_tracing(PID, [PidOldUser || {PidOldUser, _} <- L], Probs(contact_tracing)),
       visit_place([{PID, Ref} | L], Probs);
     {end_visit, PID, Ref} ->
       visit_place(set_subtract(L, [{PID, Ref}]), Probs)
@@ -34,7 +34,7 @@ contact_tracing(NewUser, [PidOldUser | T], Prob) ->
   case Prob() of
     1 ->
       NewUser ! {contact, PidOldUser},
-      io:format("Contact from ~p to ~p~n", [NewUser, PidOldUser]);
+      io:format("~p Contact from ~p to ~p~n", [self(), NewUser, PidOldUser]);
     _ -> ok
   end,
   contact_tracing(NewUser, T, Prob).
@@ -47,7 +47,7 @@ check_for_closing(Prob) ->
   end.
 
 start() ->
-  [spawn(fun luogo/0) || _ <- lists:seq(1, 10)].
+  [spawn(fun luogo/0) || _ <- lists:seq(1, 1000)].
 
 luogo() ->
   io:format("Io sono il luogo ~p~n", [self()]),

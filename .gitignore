@@ -19,3 +19,5 @@ _checkouts/
 Contact-Tracing.iml
 
 .idea/
+
+*.log

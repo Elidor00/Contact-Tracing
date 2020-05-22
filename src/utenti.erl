@@ -39,7 +39,7 @@ dispatcher_loop(ContactTrace, RequiredTest, MergList, VisitPlace) ->
       exit(R);
     Msg ->
       % Check unexpected message from other actors
-      io:format("[Dispatcher] ~p  ~p~n", [self(), Msg])
+      io:format("[Dispatcher] ~p Unexpected message ~p~n", [self(), Msg])
   end,
   dispatcher_loop(ContactTrace, RequiredTest, MergList, VisitPlace).
 
@@ -132,7 +132,7 @@ trace_contact_loop(PidDispatcher) ->
         io:format("[User] ~p unable to link to ~p error ~p~n", [PidDispatcher, PID, X])
       end,
       trace_contact_loop(PidDispatcher);
-    {'EXIT', _, R} ->
+    {'EXIT', Pid, R} ->
       case R of
         quarantine ->
           io:format("[User] ~p entro in quaratena ~n", [PidDispatcher]),
@@ -140,8 +140,7 @@ trace_contact_loop(PidDispatcher) ->
         positive ->
           io:format("[User] ~p entro in quaratena ~n", [PidDispatcher]),
           exit(quarantine);
-        Msg ->
-          io:format("[User] ~p mex non gestito ~p ~n", [self(),Msg])
+        _ -> io:format("[User] ~p mex non gestito: ~p da ~p ~n", [PidDispatcher,R, Pid])
       end;
     Msg ->
       % Check unexpected message from other actors
@@ -171,4 +170,4 @@ utente() ->
   main().
 
 start() ->
-  [spawn(fun utente/0) || _ <- lists:seq(1, 10)].
+  [spawn(fun utente/0) || _ <- lists:seq(1, 1000)].
