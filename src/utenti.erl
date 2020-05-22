@@ -35,8 +35,7 @@ dispatcher_loop(ContactTrace, RequiredTest, MergList, VisitPlace) ->
     negative -> RequiredTest ! negative;
     end_visit -> VisitPlace ! end_visit;
     {'EXIT', Sender, R} ->
-      io:format("[Dispatcher] ~p received exit from ~p with: ~p~n", [self(), Sender, R]),
-      exit(R);
+      handle_exit_messages(R, "Dispatcher", self(), Sender);
     Msg ->
       % Check unexpected message from other actors
       io:format("[Dispatcher] ~p Unexpected message ~p~n", [self(), Msg])
@@ -57,14 +56,29 @@ list_handler(PidDispatcher, L) ->
     {_, _, process, Pid, _} ->
       global:send(server, {get_places, PidDispatcher}),
       list_handler(PidDispatcher, set_subtract(L,[Pid]));
+    {'EXIT', Pid, R} ->
+      handle_exit_messages(R, "ListHandler", PidDispatcher, Pid);
     Msg ->
       % Check unexpected message from other actors
       io:format("[User] ~p Messaggio non gestito ~p~n", [self(), Msg]),
       list_handler(PidDispatcher, L)
   end.
 
+handle_exit_messages(R, Name, PidDispatcher, Pid) ->
+  case R of
+    quarantine ->
+      io:format("[~p] ~p entro in quaratena ~n", [Name, PidDispatcher]),
+      exit(quarantine);
+    positive ->
+      io:format("[~p] ~p entro in quaratena ~n", [Name, PidDispatcher]),
+      exit(quarantine);
+    _ -> io:format("[~p] ~p mex non gestito: ~p da ~p ~n", [Name, PidDispatcher, R, Pid])
+  end.
+
 get_places_update(PidDispatcher, ActorList) ->
   receive
+    {'EXIT', Pid, R} ->
+      handle_exit_messages(R, "GetPlacesUpdates", PidDispatcher, Pid);
     {places, PIDLIST} ->
       ActorList ! {get_list, self()},
       receive
@@ -84,6 +98,8 @@ get_places_update(PidDispatcher, ActorList) ->
 check_list(ActorList, PidDispatcher) ->
   ActorList ! {get_list, self()},
   receive
+    {'EXIT', Pid, R} ->
+      handle_exit_messages(R, "CheckList", PidDispatcher, Pid);
     L ->
       case length(L) >= 3 of
         true -> ok;
@@ -98,6 +114,8 @@ check_list(ActorList, PidDispatcher) ->
 visit_place(ActorList, PidDispatcher) ->
   ActorList ! {get_list, self()},
   receive
+    {'EXIT', Pid, R} ->
+      handle_exit_messages(R, "VisitPlace", PidDispatcher, Pid);
     L ->
       case length(L) >= 1 of
         true ->
@@ -133,15 +151,7 @@ trace_contact_loop(PidDispatcher) ->
       end,
       trace_contact_loop(PidDispatcher);
     {'EXIT', Pid, R} ->
-      case R of
-        quarantine ->
-          io:format("[User] ~p entro in quaratena ~n", [PidDispatcher]),
-          exit(quarantine);
-        positive ->
-          io:format("[User] ~p entro in quaratena ~n", [PidDispatcher]),
-          exit(quarantine);
-        _ -> io:format("[User] ~p mex non gestito: ~p da ~p ~n", [PidDispatcher,R, Pid])
-      end;
+      handle_exit_messages(R, "TraceContact", PidDispatcher, Pid);
     Msg ->
       % Check unexpected message from other actors
       io:format("[User] ~p Messaggio non gestito ~p~n", [self(), Msg])
@@ -155,6 +165,8 @@ require_test(PidDispatcher, Probability) ->
       PidOspedale = check_service(ospedale),
       PidOspedale ! {test_me, PidDispatcher},
       receive
+        {'EXIT', Pid, R} ->
+          handle_exit_messages(R, "RequireTest", PidDispatcher, Pid);
         positive ->
           io:format("[User] ~p sono positivo ~n", [PidDispatcher]),
           PidDispatcher ! end_visit,
