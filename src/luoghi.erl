@@ -21,11 +21,20 @@ get_probs() ->
 visit_place(L, Probs) ->
   receive
     {begin_visit, PID, Ref} ->
+      MRef = monitor(process, PID),
+      % PidOldUser can die
+      contact_tracing(PID, [PidOldUser || {PidOldUser, _, _} <- L], Probs(contact_tracing)),
       check_for_closing(Probs(check_for_closing)),
-      contact_tracing(PID, [PidOldUser || {PidOldUser, _} <- L], Probs(contact_tracing)),
-      visit_place([{PID, Ref} | L], Probs);
+      visit_place([{PID, Ref, MRef} | L], Probs);
     {end_visit, PID, Ref} ->
-      visit_place(set_subtract(L, [{PID, Ref}]), Probs)
+      [MRef] = [MR || {Pid, _, MR} <- L, Pid =:= PID],
+      demonitor(MRef),
+      visit_place(set_subtract(L, [{PID, Ref, MRef}]), Probs);
+    {'DOWN', MRef, process, PidExit, Reason} ->
+      [{Ref, MRef}] = [{R, MR} || {Pid, R, MR} <- L, Pid =:= PidExit],
+      io:format("[Luogo] ~p Utente ~p con Ref  ~p morto per ~p ~n", [self(), PidExit, Ref, Reason]),
+      NL = set_subtract(L, [{PidExit, Ref, MRef}]),
+      visit_place(NL, Probs)
   end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%% PROTOCOLLO DI RILEVAMENTO DEI CONTATTI %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -34,7 +43,7 @@ contact_tracing(NewUser, [PidOldUser | T], Prob) ->
   case Prob() of
     1 ->
       NewUser ! {contact, PidOldUser},
-      io:format("~p Contact from ~p to ~p~n", [self(), NewUser, PidOldUser]);
+      io:format("[Luogo] ~p Contatto da ~p a ~p~n", [self(), NewUser, PidOldUser]);
     _ -> ok
   end,
   contact_tracing(NewUser, T, Prob).
